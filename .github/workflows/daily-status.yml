@@ -11,19 +11,19 @@ jobs:
     name: Status
     runs-on: ubuntu-latest
     steps:
-      - name: Set quote of the day as my status
+      - name: Set emoji rebus of the day as my status
         uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.QOD_GH_PAT }}
           script: |
-            const url = 'https://github.com/lussebullar/lussebullar/releases/download/assets-v1/quotes.json'
+            const url = 'https://github.com/lussebullar/lussebullar/releases/download/assets-v1/rebus.json'
             const response = await fetch(url)
             if (!response.ok) throw new Error(`Failed to download ${url}: ${response.status}`)
-            const quotes = await response.json()
+            const rebuses = await response.json()
 
             const now = new Date()
             const dayOfYear = Math.floor((now - Date.UTC(now.getUTCFullYear(), 0, 1)) / 86400000)
-            const message = quotes[dayOfYear % quotes.length]
+            const message = `B2B emoji rebus of the day: ${rebuses[dayOfYear % rebuses.length].rebus}`
 
             const query = `mutation changeUserStatus ($input: ChangeUserStatusInput!) {
               changeUserStatus (input: $input) {
@@ -34,9 +34,13 @@ jobs:
               }
             }`
 
-            await github.graphql(query, {
+            // GitHub ignores a status it rejects, such as one over 80 characters, without returning an error
+            const { changeUserStatus } = await github.graphql(query, {
               input: {
-                emoji: '💬',
+                emoji: '🧩',
                 message
               }
             })
+            if (changeUserStatus.status?.message !== message) {
+              throw new Error(`GitHub kept the old status "${changeUserStatus.status?.message}" instead of "${message}"`)
+            }
