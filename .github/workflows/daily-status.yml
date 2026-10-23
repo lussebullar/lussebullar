@@ -1,0 +1,42 @@
+name: Daily status
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Once a day at 8 AM UTC
+    - cron: 0 8 * * *
+
+jobs:
+  status:
+    name: Status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set quote of the day as my status
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.QOD_GH_PAT }}
+          script: |
+            const url = 'https://github.com/lussebullar/lussebullar/releases/download/assets-v1/quotes.json'
+            const response = await fetch(url)
+            if (!response.ok) throw new Error(`Failed to download ${url}: ${response.status}`)
+            const quotes = await response.json()
+
+            const now = new Date()
+            const dayOfYear = Math.floor((now - Date.UTC(now.getUTCFullYear(), 0, 1)) / 86400000)
+            const message = quotes[dayOfYear % quotes.length]
+
+            const query = `mutation changeUserStatus ($input: ChangeUserStatusInput!) {
+              changeUserStatus (input: $input) {
+                status {
+                  emoji
+                  message
+                }
+              }
+            }`
+
+            await github.graphql(query, {
+              input: {
+                emoji: '💬',
+                message
+              }
+            })
